@@ -1,0 +1,63 @@
+!!ARBfp1.0
+# PBR override: fp_model_armor_legacy (skinned character body/robe + placeables).
+# Stock: diffuse·vtxlight, envmap reflect mix by diffuse alpha, fog.
+# Added: directional-sun shadow receive. Pairs with vp_skinned_env_lit override,
+# which emits world normal/pos in texcoord[4]/[5]. Without those this is a no-op
+# darken (P5=0 samples map edge → out-of-bounds → lit), so it degrades safely.
+#
+# Darken handle: cast shadow only.
+# v0 vertex light already handles back-face shading; gating darken on NdotL
+# doubled-darkens the sun-away side. Casts only via shClip.x.
+
+ATTRIB v0 = fragment.color.primary;
+ATTRIB v1 = fragment.color.secondary;
+ATTRIB T0 = fragment.texcoord[0];
+ATTRIB T1 = fragment.texcoord[1];
+ATTRIB N4 = fragment.texcoord[4];   # world normal (from VP override)
+ATTRIB P5 = fragment.texcoord[5];   # world position (from VP override)
+
+PARAM c[2]      = { program.env[0..1] };
+PARAM tnD       = program.env[27];   # xyz = sun dir
+PARAM tnE       = program.env[28];   # x=sunDiffIntens y=sunR z=sunG w=sunB
+PARAM tnF       = program.env[29];   # x=str y=viz z=floor w=bias
+PARAM tnG       = program.env[30];   # x=shadowDarken w=nrmBias
+PARAM lightK[4] = { program.env[100..103] };  # world path: TMU6, last frame's complete map (static + dynamic, 1-frame lag)
+PARAM pcfStep   = program.env[32];   # (1/res, 1/res, 0, 0)
+
+TEMP r0, r1, alb, sunC, ndl;
+TEMP shClip, shUV, shUV2, shZ, shDepth, shadowed, tmp;
+
+TEX r0, T0, texture[0], 2D;
+TEX r1, T1, texture[1], CUBE;
+MOV alb.rgb, r0;                 # stash albedo for sun diffuse
+MUL r0.rgb, r0, v0;
+LRP r0.rgb, r0.a, r0, r1;
+
+# === Shadow sample (see fp_worldtex_env_fog for full commentary) ===
+# @include shadow_receive_self
+
+# NdotL on sun (shared by sun-diffuse and darken below). Back faces -> 0.
+DP3 ndl.x, N4, tnD;
+MAX ndl.x, ndl.x, 0.0;
+
+# === Sun diffuse: NdotL * intens * sunColor * albedo, gated by cast shadow ===
+MUL tmp.x, ndl.x, tnE.x;
+MUL tmp.x, tmp.x, shClip.x;
+MUL sunC.rgb, alb, tnE.yzwx;     # albedo * (sunR, sunG, sunB)
+MAD r0.rgb, sunC, tmp.x, r0;
+
+# === Cast-shadow darken only ===
+# v0 vertex light already handles back-face shading. Gating darken on NdotL
+# doubled-darkens the sun-away side: NdotL=0 → occlusion=1 → ~0.545× floor.
+# Use raw occlusion (shClip.x) so only real shadow-map casts darken.
+SUB tmp.y, 1.0, shClip.x;      # occlusion (cast only)
+MUL tmp.y, tmp.y, tnG.x;       # * shadowDarken
+SUB tmp.y, 1.0, tmp.y;
+MAX tmp.y, tmp.y, tnF.z;       # floor clamp (min brightness)
+LRP tmp.y, tnF.x, tmp.y, 1.0;  # master strength (str=0 -> off)
+MUL r0.rgb, r0, tmp.y;
+
+LRP r0.rgb, v1.r, c[1], r0;
+MOV r0.a, c[0];
+MOV result.color, r0;
+END

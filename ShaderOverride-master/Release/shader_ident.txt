@@ -1,0 +1,92 @@
+# Legacy (pre-Aspyr) hashes — kept for compatibility
+fp0cfb19f1d85cd5c37f3c692328bba31a=fp_gammaslider
+fp75b569cacc8ad4ed81ccc6f2a1a707a2=fp_worldtex_legacy
+fp681da397a37042508229ff18b13b1b47=fp_model_armor_legacy
+fp1d9ec2f7f48d78f6e5a0ae08e3285e80=fp_model_headgear_legacy
+fpc18cd4111473013bb2692295e3930668=fp_model_weapons_legacy
+fpf588f1e8aa243931e755e75e07f7f5c0=fp_speedblur
+vpa90a0ffb5a5612c621b9d3d8b52d12ce=vp_worldtex_legacy
+vp41ebb0ef770e4fca65fa4dfcc7195b46=vp_model_weapons_legacy
+
+# === Fragment programs (post-Aspyr + 3C-FD) ===
+# Naming: fp_worldtex_* = world geometry (has lightmap path)
+#         fp_model_*    = chars/placeables/items (no lightmap, per-vertex Lambert)
+
+# Worldtex / static lit geometry
+fp453ee48bf77bde3aa50e1106937094b8=fp_worldtex_lm_fog_alpha
+fpffceb52582fe3f52825bbae40d37a3df=fp_worldtex_env_fog
+fpfc23cae515ce77bccaf32dfb6da3639d=fp_worldtex_lm_env
+fp629e81cb572e1063a5dd24e648e98733=fp_model_env_fog
+
+# Bumpmapped (DOT3 normal) — PBR PRIME TARGETS
+fp1084850457861f7557e56c9c07191b86=fp_worldtex_bump_env
+fp63514bc21103e723c5a886dcb6170731=fp_worldtex_bump_env_gamma
+fpc1844945915ea1035febf17ef5e23cdd=fp_model_bump_env_spec
+fpfbc0733977400824d1c1a863fefb20f3=fp_model_bump_env_spec_b
+fp50b8196bbed8d5bed0a4f034f90c8975=fp_fx_telepathy_screen
+fp81c211d3d7df471fa7fa075e83476fae=fp_bump_screenspace
+
+# Ambient / global light pass (validated test #1+#3 — NOT terrain)
+# Applied as overlay on most outdoor surfaces. Without it, surfaces look unlit.
+fp6390ed762b602ef3d72d6d07da93eaf6=fp_ambient_overlay
+fp77aec9d07ad6202fedca0a965cbfd26d=fp_post_composite_mid
+
+# Model diffuse + gamma family (c7 const)
+fp2b7198ca4e1493478a0597082718aa7f=fp_model_lm_gamma
+fp2d40c11a05827f5f0bc4dcf33f24e3b4=fp_model_diff_gamma
+fp6ab9f0fd349711f9d5002bd41319a986=fp_model_diff_gamma_v
+fp8027d50be844c8f705a609aaebe18ac9=fp_model_diff_gamma_c1
+fpb48b519e3e1fdb576862eeeb5af42a7a=fp_hologram
+fp5c5eaec0366a72a534c6861eaa5adfa7=fp_model_lm_gamma_b
+fpe1ee049f2eb1c473ca8c012b419b56e0=fp_model_lm_gamma_dual
+fpcf54bef7411a786b05c21afd42452e33=fp_model_skin_lm_gamma
+fp8724c0b74111e89cae6fba72e6706b62=fp_model_skin_lm_gamma_sub
+
+# Model + LUT (per-pixel color grading)
+fp267e8b2ae440d43dda0a3be123134e7a=fp_model_lm_lut_gamma
+fp1effd0e10d8fbc09c6469d914022ddf0=fp_model_lm_lut
+fp782a653ba7e4dae3e720d79f4f365dec=fp_model_lm_lut_sub
+fpeabbc7ed794e916f88c8c25ff1a334c8=fp_model_lm_lut_add
+
+# Worldtex + detail (3-tex)
+fp0f13734aa18ee529970aeaa48dd06eca=fp_worldtex_detail3
+
+# Postprocess
+fp23ad2e8d398613f7912c1d206e10aa76=fp_post_grading
+fp49b103947cab120c2f265b40be3182c6=fp_post_lut3x1d_v
+fpd8b0f6d770e12f6654c9485fd3418b59=fp_video_player
+fp832746a1c2eb7be794faa54adfa49b09=fp_main_menu
+fp5fc1e093ce9eb4ea74fce1253ba005fe=fp_fx_space_distort
+fpe4ee372e72bd2cbd3a39c08e44ef6f62=fp_post_composite_top
+fp532b2bf063c06097748a45e55c01cfd8=fp_fx_surveillance
+fp87c8287368d7c6c9e168a475b8078b81=fp_post_lut3d_sub
+fp7b3d003cd8f3a4515eeb557df499fd31=fp_door
+
+# UI / GUI / outdoor model
+fp2512591fad44577d21d3ec69d5700440=fp_ui_2tex
+fp46ca8edb6deeb8de1be73a3d59a068d1=fp_model_diff_simple
+fpadef906b56fa506c875ebf37e0a3b369=fp_model_diff_nolm
+fpfbc7aab3ee1c3af434a44a58cbfe269b=fp_ui_vertcolor
+
+# === Vertex programs (post-Aspyr + 3C-FD) ===
+
+# Static geometry, lights, fog (patched)
+vp2800fb1fd0a2d9af18d93abea9cc3a46=vp_static_lit_fog
+vp0e76f3a778bd99844486a0ffff95d1a6=vp_static_env_fog
+vpcb045a527d0177659eca2ff596325aef=vp_worldtex_env_fog_t2
+
+# Skinned (bone-weighted) models
+vpab3103fe80f62bb7e3899a2c2296ee59=vp_skinned_lit_fog
+vp93aed5c7693ffd9c10b79db5af8d69e3=vp_skinned_env_lit
+vp848cb72ed759482dcdba2987d92ff666=vp_skinned_bump_env
+vpe074fdf9892b401d8894cfa1fadf3c74=vp_skinned_displaced
+
+# Static bumpmapped
+vp9d86e29f6fa6aee37f092caf6c3989b5=vp_static_bump_env
+
+# Displacement / outline
+vp78b12453bfa69f0704fd9ec4ee1cb8c1=vp_static_displaced
+
+# GUI / special
+vpe28b397ecb30595aa85cff33c8fc682a=vp_gui_icon
+vpf79c7de1a14c5e1924bb245f8d6e5499=vp_fog_volume

@@ -1,0 +1,55 @@
+!!ARBfp1.0
+# PBR override: fp_model_headgear_legacy (skinned head/mask/helmet).
+# Stock: diffuse·vtxlight, additive overlay r1 by (1-r0.a).
+# Added: directional-sun shadow receive (cast + self-shadow). Pairs with
+# vp_skinned_lit_fog override which emits world normal/pos in texcoord[4]/[5].
+
+ATTRIB v0 = fragment.color.primary;
+ATTRIB T0 = fragment.texcoord[0];
+ATTRIB T1 = fragment.texcoord[1];
+ATTRIB N4 = fragment.texcoord[4];   # world normal (from VP override)
+ATTRIB P5 = fragment.texcoord[5];   # world position (from VP override)
+
+PARAM c[1]      = { program.env[0] };
+PARAM tnD       = program.env[27];   # xyz = sun dir
+PARAM tnE       = program.env[28];   # x=sunDiffIntens y=sunR z=sunG w=sunB
+PARAM tnF       = program.env[29];   # x=str y=viz z=floor w=bias
+PARAM tnG       = program.env[30];   # x=shadowDarken w=nrmBias
+PARAM lightK[4] = { program.env[100..103] };  # world path: TMU6, last frame's complete map (static + dynamic, 1-frame lag)
+PARAM pcfStep   = program.env[32];
+
+TEMP r0, r1, rTemp0, alb, sunC, ndl;
+TEMP shClip, shUV, shUV2, shZ, shDepth, shadowed, tmp;
+
+TEX r0, T0, texture[0], 2D;
+TEX r1, T1, texture[1], 2D;
+MOV alb.rgb, r0;                 # stash albedo for sun diffuse
+MUL r0.rgb, r0, v0;
+SUB rTemp0, 1.0, r0;
+MAD r0.rgb, rTemp0.a, r1, r0;
+
+# === Shadow sample ===
+# @include shadow_receive_self
+
+# NdotL on sun (shared by sun-diffuse and darken below). Back faces -> 0.
+DP3 ndl.x, N4, tnD;
+MAX ndl.x, ndl.x, 0.0;
+
+# === Sun diffuse: NdotL * intens * sunColor * albedo, gated by cast shadow ===
+MUL tmp.x, ndl.x, tnE.x;
+MUL tmp.x, tmp.x, shClip.x;
+MUL sunC.rgb, alb, tnE.yzwx;
+MAD r0.rgb, sunC, tmp.x, r0;
+
+# === Cast-shadow darken only ===
+# v0 vertex light handles back-face; NdotL gate would ~2× darken sun-away side.
+SUB tmp.y, 1.0, shClip.x;   # occlusion (cast only)
+MUL tmp.y, tmp.y, tnG.x;
+SUB tmp.y, 1.0, tmp.y;
+MAX tmp.y, tmp.y, tnF.z;
+LRP tmp.y, tnF.x, tmp.y, 1.0;
+MUL r0.rgb, r0, tmp.y;
+
+MOV r0.a, c[0];
+MOV result.color, r0;
+END

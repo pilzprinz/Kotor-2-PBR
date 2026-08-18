@@ -1,0 +1,11 @@
+!!ARBvp1.0
+# Shadow caster VP for static geometry.
+# Reads light-space MVP from program.env[100..103] (pushed by shadow_map.cpp
+# per draw), outputs only light-clip position. No color/normal/light work —
+# depth-only target (shadow FBO has no color attachment).
+PARAM lightMVP[4] = { program.env[100..103] };
+DP4 result.position.x, lightMVP[0], vertex.position;
+DP4 result.position.y, lightMVP[1], vertex.position;
+DP4 result.position.z, lightMVP[2], vertex.position;
+DP4 result.position.w, lightMVP[3], vertex.position;
+END

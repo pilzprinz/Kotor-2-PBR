@@ -1,0 +1,22 @@
+i686-w64-mingw32-g++ -O2 -Wall -m32 -std=c++11 -DWIN32 -D_WINDOWS -D_USRDLL -c glsl_program.cpp -o glsl_program.o
+glsl_program.cpp: In function 'void GlslErrLog(const char*, ...)':
+glsl_program.cpp:141:5: error: 'GetDllDirPath' was not declared in this scope; did you mean 'GetDllDirectory'?
+  141 |     GetDllDirPath(dir, sizeof(dir));
+      |     ^~~~~~~~~~~~~
+      |     GetDllDirectory
+glsl_program.cpp: In function 'void GlslMaterial_OnFrame()':
+glsl_program.cpp:1034:11: error: 's_fCount' was not declared in this scope; did you mean 's_frameCount'?
+ 1034 |     if (++s_fCount >= 60) {
+      |           ^~~~~~~~
+      |           s_frameCount
+glsl_program.cpp: At global scope:
+glsl_program.cpp:1022:13: warning: 'void PerfApplyEnd()' defined but not used [-Wunused-function]
+ 1022 | static void PerfApplyEnd()
+      |             ^~~~~~~~~~~~
+glsl_program.cpp:1016:13: warning: 'void PerfApplyStart()' defined but not used [-Wunused-function]
+ 1016 | static void PerfApplyStart()
+      |             ^~~~~~~~~~~~~~
+glsl_program.cpp:1014:15: warning: 's_frameCount' defined but not used [-Wunused-variable]
+ 1014 | static int    s_frameCount = 0;     // frames since last report
+      |               ^~~~~~~~~~~~
+make: *** [Makefile:37: glsl_program.o] Error 1

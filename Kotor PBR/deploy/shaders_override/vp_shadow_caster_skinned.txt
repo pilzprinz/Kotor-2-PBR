@@ -1,0 +1,53 @@
+!!ARBvp1.0
+# Skinned shadow caster VP.
+# Bone-blend vertex.position (4-bone palette via vertex.attrib[1] weights +
+# vertex.attrib[4] indices), then transform to light clip via lightMVP from
+# program.env[100..103] (pushed by shadow_map.cpp per draw).
+# Depth-only — no color/uv/normal outputs.
+
+PARAM lightMVP[4]   = { program.env[100..103] };
+PARAM boneArray[51] = { program.env[18..68] };
+ATTRIB vWeight      = vertex.attrib[1];
+ADDRESS A0;
+TEMP vReg0, vReg1, vReg2, vReg3, vReg4, vReg9;
+
+# Bone indices × env[16].zzzz (K2 scale factor)
+MUL vReg0, vertex.attrib[4], program.env[16].zzzz;
+
+# Bone 0
+ARL A0.x, vReg0.x;
+DP4 vReg1.x, vertex.position, boneArray[A0.x + 0];
+DP4 vReg1.y, vertex.position, boneArray[A0.x + 1];
+DP4 vReg1.z, vertex.position, boneArray[A0.x + 2];
+
+# Bone 1
+ARL A0.x, vReg0.y;
+DP4 vReg2.x, vertex.position, boneArray[A0.x + 0];
+DP4 vReg2.y, vertex.position, boneArray[A0.x + 1];
+DP4 vReg2.z, vertex.position, boneArray[A0.x + 2];
+
+# Bone 2
+ARL A0.x, vReg0.z;
+DP4 vReg3.x, vertex.position, boneArray[A0.x + 0];
+DP4 vReg3.y, vertex.position, boneArray[A0.x + 1];
+DP4 vReg3.z, vertex.position, boneArray[A0.x + 2];
+
+# Bone 3
+ARL A0.x, vReg0.w;
+DP4 vReg4.x, vertex.position, boneArray[A0.x + 0];
+DP4 vReg4.y, vertex.position, boneArray[A0.x + 1];
+DP4 vReg4.z, vertex.position, boneArray[A0.x + 2];
+
+# Weighted blend
+MUL vReg9, vWeight.x, vReg1;
+MAD vReg9, vReg2, vWeight.y, vReg9;
+MAD vReg9, vReg3, vWeight.z, vReg9;
+MAD vReg9, vReg4, vWeight.w, vReg9;
+MOV vReg9.w, program.env[16].w;
+
+# Light clip
+DP4 result.position.x, lightMVP[0], vReg9;
+DP4 result.position.y, lightMVP[1], vReg9;
+DP4 result.position.z, lightMVP[2], vReg9;
+DP4 result.position.w, lightMVP[3], vReg9;
+END

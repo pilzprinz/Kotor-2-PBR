@@ -1,0 +1,234 @@
+!!ARBfp1.0
+# PBR fp_worldtex_lm_env — walls/lightmapped + envmap, NO fog.
+# Conservative: stock K2 base + Schlick Fresnel + L0 Blinn-Phong spec (gated).
+# AO (normal.a), emissive (rough.a), energy conservation on PBR path.
+
+ATTRIB v  = fragment.color.primary;
+ATTRIB T  = fragment.texcoord[0];
+ATTRIB Y  = fragment.texcoord[1];      # lightmap UV
+ATTRIB U  = fragment.texcoord[2];      # cube reflect coord
+ATTRIB N4 = fragment.texcoord[4];
+ATTRIB P5 = fragment.texcoord[5];
+
+PARAM c[1]   = { program.env[0] };
+PARAM pbr    = program.env[20];   # x=metal y=rough z=F0 w=emiScale
+PARAM fl     = program.env[21];   # x=useNrm y=useRgh z=useMtl w=useAO
+PARAM ns     = program.env[22];   # x=nrmStr y=useEmi z=cavityStr w=fresRim
+PARAM ux     = program.env[23];   # x=reflectivity
+PARAM tn     = program.env[24];   # x=sheenStr y=detBlend z=detUV w=alphaShiftK
+PARAM tnB    = program.env[25];   # x=perturb y=lodScale z=L0Gain w=sunGain
+PARAM tnC    = program.env[26];   # x=envBoost y=L0Exp z=SunExp
+PARAM tnD    = program.env[27];   # xyz=sunDir w=diffDim
+PARAM tnE    = program.env[28];   # x=sunDiffIntens y=sunR z=sunG w=sunB
+PARAM tnF    = program.env[29];   # x=str y=viz z=floor w=bias
+PARAM tnG    = program.env[30];   # x=shadowDarken y=orbitR(C++ only)
+PARAM lightK[4] = { program.env[100..103] };
+PARAM L0pos  = program.env[87];
+PARAM L0diff = program.env[86];
+PARAM dF0    = { 0.04, 0.04, 0.04, 0.0 };
+PARAM lumW   = { 0.2126, 0.7152, 0.0722, 0.0 };
+PARAM envFlr = { 0.75, 0.25, 1.0, 0.0 };
+PARAM pcfStep = program.env[32];  # (1/res, 1/res, 0, 0) pushed by C++
+
+TEMP d, l, m, nrm, rough, metal, rs, mt;
+TEMP V, N, F0, F, fres;
+TEMP r, s, env, tmp, camW, Ldir, H, NdotH, NdotV, spec, usePbr, lit;
+TEMP ao, kd, refDir, nrmD, irr, irrDir;
+TEMP shClip, shUV, shUV2, shZ, shDepth, shadowed;
+
+TEX d, T, texture[0], 2D;
+TEX l, Y, texture[1], 2D;
+
+TEX nrm,   T, texture[8],  2D;
+TEX rough, T, texture[9],  2D;
+TEX metal, T, texture[10], 2D;
+
+CMP rs.x, pbr.y, 1.0, pbr.y;
+LRP rs.x, fl.y, rough.r, rs.x;
+CMP mt.x, pbr.x, 1.0, pbr.x;
+LRP mt.x, fl.z, metal.r, mt.x;
+
+SGE usePbr.x, pbr.y, 0.0;
+MAX usePbr.x, usePbr.x, fl.y;
+
+
+MAD nrm.xyz, nrm, 2.0, -1.0;
+
+# Detail normal: 8× UV resample of same _n.tga, whiteout xy blend weight 0.3
+MUL refDir.xy, T, tn.z;
+TEX nrmD, refDir, texture[8], 2D;
+MAD nrmD.xy, nrmD, 2.0, -1.0;
+MAD nrm.xy, nrmD, tn.y, nrm;
+MUL nrm.xy, nrm, ns.x;       # normalStrength (env[22].x): scale tangent bump xy (0=flat, 1=stock, >1=stronger). Was dead — now wired so txi normalStrength bites.
+DP3 nrm.w, nrm, nrm;
+RSQ nrm.w, nrm.w;
+MUL nrm.xyz, nrm, nrm.w;
+MUL N.xyz, nrm, fl.x;
+ADD N.xyz, N, N4;
+DP3 N.w, N, N;
+RSQ N.w, N.w;
+MUL N.xyz, N, N.w;
+
+MOV camW.x, program.env[92].w;
+MOV camW.y, program.env[91].w;
+MOV camW.z, program.env[90].w;
+SUB V.xyz, camW, P5;
+DP3 V.w, V, V;
+RSQ V.w, V.w;
+MUL V.xyz, V, V.w;
+
+# Perturbed reflect on PBR (30% mix), VP-reflect on stock
+DP3 tmp.x, N, V;
+MUL refDir.xyz, N, tmp.x;
+ADD refDir.xyz, refDir, refDir;
+SUB refDir.xyz, refDir, V;
+MUL tmp.x, fl.x, tnB.x;
+LRP refDir.xyz, tmp.x, refDir, U;
+MUL refDir.w, rs.x, tnB.y;
+MUL refDir.w, refDir.w, usePbr.x;   # LOD blur gated by usePbr, NOT fl.x: stock textures keep SHARP stock-K2 reflection
+TXB m, refDir, texture[2], CUBE;
+
+LRP F0.rgb, mt.x, d, dF0;
+DP3 NdotV.x, N, V;
+MAX NdotV.x, NdotV.x, 0.0;
+SUB fres.x, 1.0, NdotV.x;
+MUL tmp.x, fres.x, fres.x;
+MUL tmp.x, tmp.x, tmp.x;
+MUL fres.x, tmp.x, fres.x;
+LRP F.rgb, fres.x, 1.0, F0;
+
+MUL r.rgb, v, d;
+MAD r.rgb, l, d, r;
+
+# Energy conservation: diffuse *= (1-F) · (1-metal). Gated by usePbr.
+SUB kd.x, 1.0, fres.x;
+SUB tmp.x, 1.0, mt.x;
+MUL kd.x, kd.x, tmp.x;
+LRP kd.x, usePbr.x, kd.x, 1.0;
+MUL r.rgb, r, kd.x;
+
+# Emissive — additive, NOT modulated by env/lit (glows in shadow).
+MUL tmp.x, rough.a, pbr.w;
+MUL tmp.x, tmp.x, ns.y;
+MAD r.rgb, d, tmp.x, r;
+
+# Environment irradiance: ambient diffuse from cube mip 5 along N
+MOV irrDir.xyz, N;
+MOV irrDir.w, 5.0;
+TXB irr, irrDir, texture[2], CUBE;
+MUL irr.rgb, irr, d;
+MUL tmp.x, kd.x, usePbr.x;
+MAD r.rgb, irr, tmp.x, r;
+
+# Light proxy = luma(v+l) — gated by usePbr so stock textures match K2 exactly.
+ADD lit.xyz, v, l;
+DP3 lit.x, lit, lumW;
+MAD lit.x, lit.x, envFlr.x, envFlr.y;
+MIN lit.x, lit.x, envFlr.z;
+LRP lit.x, usePbr.x, lit.x, 1.0;
+
+# AO from normal.a — blend toward 1 by useAO · cavityStrength.
+# Clamp [0,1] so cavitystrength > 1 saturates instead of going negative.
+SUB ao.x, nrm.a, 1.0;
+MUL tmp.x, fl.w, ns.z;
+MAD ao.x, ao.x, tmp.x, 1.0;
+MAX ao.x, ao.x, 0.0;
+MIN ao.x, ao.x, 1.0;
+
+# Alpha-shift on PBR (fl.x=1): treat d.a as more transparent (K=0.15)
+MUL tmp.x, fl.x, tn.w;
+SUB tmp.x, d.a, tmp.x;
+MAX tmp.x, tmp.x, 0.0;
+SUB env.x, 1.0, tmp.x;
+MUL env.x, env.x, ux.x;
+SUB tmp.x, 1.0, rs.x;
+MAD tmp.x, fres.x, ns.w, tmp.x;
+MUL tmp.x, tmp.x, ux.x;
+LRP env.x, usePbr.x, tmp.x, env.x;
+MUL env.x, env.x, lit.x;
+MUL env.x, env.x, ao.x;
+
+
+SUB Ldir.xyz, L0pos, P5;
+DP3 Ldir.w, Ldir, Ldir;
+RSQ Ldir.w, Ldir.w;
+MUL Ldir.xyz, Ldir, Ldir.w;
+ADD H.xyz, Ldir, V;
+DP3 H.w, H, H;
+RSQ H.w, H.w;
+MUL H.xyz, H, H.w;
+DP3 NdotH.x, N, H;
+MAX NdotH.x, NdotH.x, 0.0;
+POW NdotH.x, NdotH.x, tnC.y;
+SUB tmp.x, 1.0, rs.x;
+MUL NdotH.x, NdotH.x, tmp.x;
+MUL NdotH.x, NdotH.x, fl.x;
+MUL spec.rgb, L0diff, F;
+MUL spec.rgb, spec, tnB.z;
+MAD r.rgb, spec, NdotH.x, r;
+
+# === Shadow sample === (see fp_worldtex_env_fog for full commentary)
+# @include shadow_receive
+
+# Baked sun spec — ambient sheen ×0.15, F-tinted, gated by fl.x + shadow
+ADD H.xyz, tnD, V;
+DP3 H.w, H, H;
+RSQ H.w, H.w;
+MUL H.xyz, H, H.w;
+DP3 NdotH.x, N, H;
+MAX NdotH.x, NdotH.x, 0.0;
+POW NdotH.x, NdotH.x, tnC.z;
+MUL NdotH.x, NdotH.x, fl.x;
+MUL NdotH.x, NdotH.x, tn.x;
+MUL NdotH.x, NdotH.x, tnB.w;
+MUL NdotH.x, NdotH.x, shadowed.x;
+MAD r.rgb, F, NdotH.x, r;
+
+# Sun diffuse (parallel rays): NdotL * intens * color * albedo, shadowed.
+# fl.x (useNrm) gate REMOVED: sun now lights ALL surfaces via the geometric normal
+# N4 (N=N4 when no normal map), not only normal-mapped ones.
+DP3 tmp.x, N, tnD;
+MAX tmp.x, tmp.x, 0.0;
+MUL tmp.x, tmp.x, tnE.x;
+MUL tmp.x, tmp.x, shadowed.x;
+MUL spec.rgb, d, tnE.yzwx;
+MAD r.rgb, spec, tmp.x, r;
+
+# Envmap composite — tint by diffuse when metallic
+MUL tmp.rgb, m, d;
+MUL kd.x, mt.x, usePbr.x;
+LRP s.rgb, kd.x, tmp, m;
+MUL s.rgb, s, env.x;
+ADD d.rgb, r, s;
+
+# Sun-shadow global contrast (see fp_worldtex_env_fog for rationale).
+DP3 tmp.x, N4, tnD;
+MAX tmp.x, tmp.x, 0.0;
+MUL tmp.x, tmp.x, 4.0;
+MIN tmp.x, tmp.x, 1.0;
+SUB tmp.y, 1.0, shClip.x;
+MUL tmp.y, tmp.y, tmp.x;
+MUL tmp.y, tmp.y, tnG.x;
+SUB tmp.y, 1.0, tmp.y;
+MAX tmp.y, tmp.y, tnF.z;
+MUL d.rgb, d, tmp.y;
+
+# Billboard/volume shadow (txi billboardshadow=1 → env[23].y=ux.y): darken by RAW
+# sun-occlusion, UNgated by N·sun — for steam/fog/foliage sheets whose billboard
+# normal faces the camera. shClip.x = raw lit factor. ux.y=0 → no-op.
+SUB tmp.x, 1.0, shClip.x;     # occlusion (1 = fully occluded)
+MUL tmp.x, tmp.x, tnG.x;      # × shadow_darken strength
+MUL tmp.x, tmp.x, ux.y;       # × billboardShadow flag (0 on normal materials)
+SUB tmp.x, 1.0, tmp.x;        # → multiplier
+MAX tmp.x, tmp.x, tnF.z;      # clamp to shadow floor
+MUL d.rgb, d, tmp.x;
+
+# AO global (direct + indirect).
+MUL d.rgb, d, ao.x;
+MUL tmp.x, fl.x, tnD.w;
+SUB tmp.x, 1.0, tmp.x;
+MUL d.rgb, d, tmp.x;
+
+MOV d.a, c[0].a;
+MOV result.color, d;
+END

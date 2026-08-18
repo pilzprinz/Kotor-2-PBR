@@ -1,0 +1,58 @@
+!!ARBfp1.0
+# PBR override of fp_model_diff_nolm (diffuse x (vertexlight + ambient bias), no LM).
+# Adds directional sun diffuse + sun-shadow receive on the geometric world normal.
+# Reads world normal texcoord[4] / world pos texcoord[5] from the paired (overridden)
+# VP. Guarded: if the VP doesn't supply them, the sun/shadow self-cancel (no-op).
+
+ATTRIB T0 = fragment.texcoord[0];
+ATTRIB v0 = fragment.color.primary;
+ATTRIB N4 = fragment.texcoord[4];
+ATTRIB P5 = fragment.texcoord[5];
+
+PARAM c1   = program.env[1];
+PARAM tnD  = program.env[27];   # xyz=sunDir
+PARAM tnE  = program.env[28];   # x=sunDiffIntens y=sunR z=sunG w=sunB
+PARAM tnF  = program.env[29];   # x=str z=floor w=bias
+PARAM tnG  = program.env[30];   # x=shadowDarken w=nrmBias
+PARAM lightK[4] = { program.env[100..103] };
+PARAM pcfStep   = program.env[32];
+
+TEMP temp1, r0, r1, alb, N, tmp, sun, shClip, shUV, shUV2, shZ, shDepth, shadowed;
+
+TEX r0, T0, texture[0], 2D;
+MOV alb, r0;                     # raw albedo for sun term
+MAD temp1, c1, 2, -1.0;
+ADD r1.rgb, v0, temp1;
+MUL r0.rgb, r0, r1;              # stock: diffuse x (vertexlight + bias)
+
+# Geometric world normal (MAX guards RSQ vs a zero normal)
+DP3 N.w, N4, N4;
+MAX N.w, N.w, 0.0001;
+RSQ N.w, N.w;
+MUL N.xyz, N4, N.w;
+
+# === Shadow sample (self path: TMU5 + env[104..106], same-frame own depth) ===
+# @include shadow_receive_self
+
+# Sun diffuse, shadowed
+DP3 tmp.x, N, tnD;
+MAX tmp.x, tmp.x, 0.0;
+MUL tmp.x, tmp.x, tnE.x;
+MUL tmp.x, tmp.x, shadowed.x;
+MUL sun.rgb, alb, tnE.yzwx;
+MAD r0.rgb, sun, tmp.x, r0;
+
+# Sun-shadow global contrast (gated by N4.sun)
+DP3 tmp.x, N4, tnD;
+MAX tmp.x, tmp.x, 0.0;
+MUL tmp.x, tmp.x, 4.0;
+MIN tmp.x, tmp.x, 1.0;
+SUB tmp.y, 1.0, shClip.x;
+MUL tmp.y, tmp.y, tmp.x;
+MUL tmp.y, tmp.y, tnG.x;
+SUB tmp.y, 1.0, tmp.y;
+MAX tmp.y, tmp.y, tnF.z;
+MUL r0.rgb, r0, tmp.y;
+
+MOV result.color, r0;
+END

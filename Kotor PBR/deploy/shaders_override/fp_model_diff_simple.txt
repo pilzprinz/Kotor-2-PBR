@@ -1,0 +1,63 @@
+!!ARBfp1.0
+# PBR override of fp_model_diff_simple (simple diffuse x vertex-light + fog).
+# Stock had NO sun/shadow. Adds directional sun diffuse + sun-shadow RECEIVE using
+# the geometric world normal (this shader has no normal/env/rough maps). Pairs with
+# vp_skinned_lit_fog, which outputs world normal -> texcoord[4], world pos -> texcoord[5].
+# World path: samples last frame's complete shadow map (TMU6) with last-frame K (env[100..103]).
+
+ATTRIB v0 = fragment.color.primary;
+ATTRIB v1 = fragment.color.secondary;
+ATTRIB T0 = fragment.texcoord[0];
+ATTRIB N4 = fragment.texcoord[4];
+ATTRIB P5 = fragment.texcoord[5];
+
+PARAM c[2]  = { program.env[0..1] };
+PARAM tnD   = program.env[27];   # xyz=sunDir w=diffDim
+PARAM tnE   = program.env[28];   # x=sunDiffIntens y=sunR z=sunG w=sunB
+PARAM tnF   = program.env[29];   # x=str y=viz z=floor w=bias
+PARAM tnG   = program.env[30];   # x=shadowDarken w=nrmBias
+PARAM lightK[4] = { program.env[100..103] };
+PARAM pcfStep   = program.env[32];
+
+TEMP r0, alb, N, tmp, sun, shClip, shUV, shUV2, shZ, shDepth, shadowed;
+
+TEX r0, T0, texture[0], 2D;
+MOV alb, r0;                     # keep raw albedo for sun term
+MUL r0.rgb, v0, r0;              # stock: diffuse x vertex light
+
+# Geometric world normal (normalized). MAX guards RSQ vs a zero normal (if the
+# paired VP doesn't output texcoord[4] it reads ~0): N stays 0 -> sun & contrast
+# below both gate to 0 (N.sun=0), so the shader safely no-ops instead of NaN.
+DP3 N.w, N4, N4;
+MAX N.w, N.w, 0.0001;
+RSQ N.w, N.w;
+MUL N.xyz, N4, N.w;
+
+# === Shadow sample (self path: TMU5 + env[104..106], same-frame own depth) ===
+# @include shadow_receive_self
+
+# Sun diffuse (parallel rays), shadowed. NdotL on geometric normal.
+DP3 tmp.x, N, tnD;
+MAX tmp.x, tmp.x, 0.0;
+MUL tmp.x, tmp.x, tnE.x;
+MUL tmp.x, tmp.x, shadowed.x;
+MUL sun.rgb, alb, tnE.yzwx;      # albedo x sun color
+MAD r0.rgb, sun, tmp.x, r0;
+
+# Sun-shadow global contrast: darken sun-facing occluded surfaces (cast shadows
+# from other geometry/objects). Gated by N4.sun so back-faces aren't double-darkened.
+DP3 tmp.x, N4, tnD;
+MAX tmp.x, tmp.x, 0.0;
+MUL tmp.x, tmp.x, 4.0;
+MIN tmp.x, tmp.x, 1.0;
+SUB tmp.y, 1.0, shClip.x;
+MUL tmp.y, tmp.y, tmp.x;
+MUL tmp.y, tmp.y, tnG.x;
+SUB tmp.y, 1.0, tmp.y;
+MAX tmp.y, tmp.y, tnF.z;
+MUL r0.rgb, r0, tmp.y;
+
+# Stock fog (unchanged): lerp toward fog color by v1.r.
+LRP r0.rgb, v1.r, c[1], r0;
+MOV result.color, r0;
+END

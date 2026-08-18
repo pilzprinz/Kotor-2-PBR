@@ -1,0 +1,37 @@
+!!ARBfp1.0
+ATTRIB T1 = fragment.texcoord[1];
+TEMP t0, r0, sign, exponent, normal, blur;
+PARAM blurfactor = program.env[0];
+PARAM w0 = program.env[10];  # viewport: { width, height, 1/width, 1/height }
+
+MOV exponent, 15.0;
+MAD exponent.x, blurfactor.x, -exponent.x, exponent.x;
+
+MAD t0.x, T1.x, w0.z, -0.5;
+MAD t0.y, T1.y, w0.w, -0.5;
+
+CMP sign.x, t0.x, -1.0, 1.0;
+CMP sign.y, t0.y, -1.0, 1.0;
+
+MUL t0.x, t0.x, sign.x;
+MUL t0.y, t0.y, sign.y;
+
+POW r0.x, t0.x, exponent.x;
+POW r0.y, t0.y, exponent.x;
+
+SUB t0.x, t0.x, r0.x;
+SUB t0.y, t0.y, r0.y;
+
+MUL t0.x, t0.x, sign.x;
+MUL t0.y, t0.y, sign.y;
+
+ADD t0.x, t0.x, 0.5;
+ADD t0.y, t0.y, 0.5;
+
+MUL t0.x, t0.x, w0.x;
+MUL t0.y, t0.y, w0.y;
+
+TEX normal, T1, texture[1], RECT;
+TEX blur, t0, texture[1], RECT;
+MOV result.color, blur;
+END

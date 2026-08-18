@@ -1,0 +1,27 @@
+# Build artifacts
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.exp
+*.ilk
+*.pdb
+
+# IDE / editor
+.vs/
+.vscode/
+*.user
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Temp / scratch files
+tmp_*
+*.kra~
+
+# Runtime diagnostics (game-folder dumps)
+shaders_original/
+pbr_file_log.txt
+pbr_diag.log
