@@ -48,8 +48,9 @@ See [`Kotor PBR/source/BUILD.md`](Kotor PBR/source/BUILD.md) and the Makefile fo
 1. Backup `<game>/opengl32.dll` (if present)
 2. Copy `Kotor PBR/deploy/opengl32.dll` → `<game>/`
 3. Copy `Kotor PBR/deploy/shader_ident.txt` → `<game>/`
-4. Optionally apply [3C-FD-Patcher](https://github.com/J0-o/3C-FD-Patcher) first (fog/reflection fix)
-5. Run the game
+4. Copy `Kotor PBR/deploy/shaders_override/` → `<game>/`
+5. Optionally apply [3C-FD-Patcher](https://github.com/J0-o/3C-FD-Patcher) first (fog/reflection fix)
+6. Run the game
 
 Full walkthrough: [`Kotor PBR/README.md`](Kotor PBR/README.md).
 
